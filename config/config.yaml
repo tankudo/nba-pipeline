@@ -1,0 +1,14 @@
+model_config:
+  params:
+    num_leaves: 31
+    learning_rate: 0.05
+    n_estimators: 20
+
+feature_store:
+  type: "redis"
+  host: "localhost"
+  port: 6379
+
+kafka_config:
+  bootstrap_servers: "localhost:9092"
+  topic: "user_events"
