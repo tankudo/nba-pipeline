@@ -5,14 +5,8 @@ The Next Best Action (NBA) system is a machine learning pipeline that predicts o
 
 ## Architecture
 
-├── api/ # FastAPI application for serving predictions
-├── config/ # Configuration files
-├── data/ # Data ingestion and feature store
-├── models/ # ML model definitions and training
-├── pipeline/ # Prediction pipeline components
-├── utils/ # Utility functions and preprocessing
-├── monitoring/ # Metrics and monitoring
-└── tests/ # Test suite
+![image](https://github.com/user-attachments/assets/d3d7f33d-3bb6-47e6-9bdc-2db55a0f0582)
+
 
 
 ## Key Features
@@ -91,23 +85,8 @@ uvicorn api.app:app --reload --port 8000
 
 ### Directory Structure Details
 
-├── api/
-│   ├── __init__.py
-│   └── app.py               # FastAPI application
-├── config/
-│   └── config.yaml          # Configuration settings
-├── data/
-│   ├── data_ingestion.py    # Data loading
-│   └── feature_store.py     # Feature management
-├── models/
-│   ├── model.py             # Model definition
-│   └── train.py             # Training scripts
-├── pipeline/
-│   └── prediction_pipeline.py # Prediction logic
-├── utils/
-│   └── preprocessing.py      # Data preprocessing
-└── monitoring/
-    └── metrics.py           # Metrics tracking
+![image](https://github.com/user-attachments/assets/72ffc571-7059-430a-a01e-3095076ca6ac)
+
 
 ## Contributing
 
