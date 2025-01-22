@@ -1,0 +1,92 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.env
+.venv
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# MLflow
+mlruns/*
+!/mlruns/models/
+mlflow.db
+
+# Data
+*.csv
+*.json
+*.xlsx
+*.xls
+*.db
+*.sqlite3
+
+# Logs
+*.log
+logs/
+logging/
+
+# Cache
+.cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Build
+build/
+*.manifest
+*.spec
+
+# Config
+config/*.yaml
+!config/config.yaml.example
+
+# Local development
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Model files
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+*.onnx
+*.pb
+
+# Temporary files
+tmp/
+temp/
