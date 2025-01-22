@@ -5,8 +5,7 @@ The Next Best Action (NBA) system is a machine learning pipeline that predicts o
 
 ## Architecture
 
-![image](https://github.com/user-attachments/assets/d3d7f33d-3bb6-47e6-9bdc-2db55a0f0582)
-
+![image](https://github.com/user-attachments/assets/8181a3a2-21c5-4de3-ad11-6ca363668518)
 
 
 ## Key Features
