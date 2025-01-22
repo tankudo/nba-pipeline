@@ -1,15 +1,28 @@
+import mlflow
+import mlflow.lightgbm
 import lightgbm as lgb
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import RandomizedSearchCV
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
+import yaml
 
 class NextBestActionModel:
-    def __init__(self, config: Dict):
-        """Initializes the model with the provided config dictionary."""
-        self.config = config
+    def __init__(self, config_path: str, model_name: str = "nba_model"):
+        """
+        Initialize the Next Best Action Model
+        
+        Args:
+            config_path: Path to configuration file
+            model_name: Name of the model for MLflow tracking
+        """
+        with open(config_path) as f:
+            self.config = yaml.safe_load(f)
+            
+        self.model_name = model_name
         self.model = None
+        self.model_uri = None
         self.feature_encoders = {}
         self.scaler = StandardScaler()
 
@@ -27,8 +40,29 @@ class NextBestActionModel:
             'min_data_in_leaf': 50,
             'verbose': -1
         }
+        
+        # Set up MLflow tracking
+        mlflow.set_tracking_uri("file:./mlruns")
 
-    def preprocess_features(self, df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
+    def _get_latest_model(self) -> Optional[str]:
+        """Get the URI of the latest model version from MLflow"""
+        client = mlflow.tracking.MlflowClient()
+        try:
+            latest_version = client.get_latest_versions(self.model_name, stages=["Production"])[0]
+            return latest_version.source
+        except:
+            return None
+
+    def load_model(self) -> bool:
+        """Load the latest model version from MLflow"""
+        model_uri = self._get_latest_model()
+        if model_uri:
+            self.model = mlflow.lightgbm.load_model(model_uri)
+            self.model_uri = model_uri
+            return True
+        return False
+
+    def preprocess_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Comprehensive feature preprocessing pipeline.
         """
@@ -62,7 +96,6 @@ class NextBestActionModel:
             else:
                 # Use mean for normal distributions
                 df[col].fillna(df[col].mean(), inplace=True)
-
             # Add missing indicator column
             df[f'{col}_is_missing'] = df[col].isna().astype(int)
         
@@ -82,7 +115,6 @@ class NextBestActionModel:
             df['day_of_week'] = pd.to_datetime(df['timestamp']).dt.dayofweek
             df['is_weekend'] = df['day_of_week'].isin([5, 6]).astype(int)
             df['month'] = pd.to_datetime(df['timestamp']).dt.month
-
             # Time since last action
             df['time_since_last_action'] = df.groupby('user_id')['timestamp'].diff().dt.total_seconds()
         
@@ -117,46 +149,76 @@ class NextBestActionModel:
 
     def train(self, X_train: pd.DataFrame, y_train: pd.Series) -> None:
         """
-        Train the model with hyperparameter optimization.
+        Train the model with hyperparameter optimization and MLflow tracking.
         """
-        train_data = lgb.Dataset(X_train, label=y_train)
-        
-        # Hyperparameter optimization
-        param_grid = {
-            'num_leaves': [15, 31, 63],
-            'learning_rate': [0.01, 0.05, 0.1],
-            'feature_fraction': [0.7, 0.8, 0.9],
-            'bagging_fraction': [0.7, 0.8, 0.9],
-            'max_depth': [4, 6, 8],
-            'min_data_in_leaf': [30, 50, 100]
-        }
-        
-        # Random search for hyperparameter optimization
-        random_search = RandomizedSearchCV(
-            estimator=lgb.LGBMClassifier(),
-            param_distributions=param_grid,
-            n_iter=20,
-            cv=5,
-            random_state=42
-        )
-        
-        random_search.fit(X_train, y_train)
-        
-        # Update model parameters with best found parameters
-        self.model_params.update(random_search.best_params_)
-        
-        # Train final model
-        self.model = lgb.train(
-            self.model_params,
-            train_data,
-            num_boost_round=1000,
-            early_stopping_rounds=50
-        )
+        with mlflow.start_run():
+            X_processed = self.preprocess_features(X_train)
+            train_data = lgb.Dataset(X_processed, label=y_train)
+            
+            # Hyperparameter optimization
+            param_grid = {
+                'num_leaves': [15, 31, 63],
+                'learning_rate': [0.01, 0.05, 0.1],
+                'feature_fraction': [0.7, 0.8, 0.9],
+                'bagging_fraction': [0.7, 0.8, 0.9],
+                'max_depth': [4, 6, 8],
+                'min_data_in_leaf': [30, 50, 100]
+            }
+            
+            # Random search for hyperparameter optimization
+            random_search = RandomizedSearchCV(
+                estimator=lgb.LGBMClassifier(),
+                param_distributions=param_grid,
+                n_iter=20,
+                cv=5,
+                random_state=42
+            )
+            
+            random_search.fit(X_processed, y_train)
+            
+            # Update model parameters with best found parameters
+            self.model_params.update(random_search.best_params_)
+            
+            # Log parameters
+            mlflow.log_params(self.model_params)
+            
+            # Train final model
+            self.model = lgb.train(
+                self.model_params,
+                train_data,
+                num_boost_round=1000,
+                early_stopping_rounds=50
+            )
+            
+            # Log metrics
+            mlflow.log_metric("best_iteration", self.model.best_iteration)
+            
+            # Log model
+            mlflow.lightgbm.log_model(
+                self.model,
+                artifact_path=self.model_name,
+                registered_model_name=self.model_name
+            )
+            
+            # Transition model to production
+            client = mlflow.tracking.MlflowClient()
+            latest_version = client.get_latest_versions(self.model_name, stages=["None"])[0]
+            client.transition_model_version_stage(
+                name=self.model_name,
+                version=latest_version.version,
+                stage="Production"
+            )
+            
+            self.model_uri = latest_version.source
 
     def predict_proba_realtime(self, features: Dict) -> np.ndarray:
         """
         Real-time prediction with feature preprocessing.
         """
+        if self.model is None:
+            if not self.load_model():
+                raise ValueError("No trained model available. Please train the model first.")
+                
         # Convert single instance to DataFrame
         df = pd.DataFrame([features])
         
@@ -166,10 +228,25 @@ class NextBestActionModel:
         # Make prediction
         return self.model.predict(df, num_iteration=self.model.best_iteration)
 
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """
+        Make predictions using the trained model
+        """
+        if self.model is None:
+            if not self.load_model():
+                raise ValueError("No trained model available. Please train the model first.")
+        
+        X_processed = self.preprocess_features(X)
+        return self.model.predict_proba(X_processed)
+
     def get_feature_importance(self) -> pd.DataFrame:
         """
         Get feature importance analysis.
         """
+        if self.model is None:
+            if not self.load_model():
+                raise ValueError("No trained model available. Please train the model first.")
+                
         importance_df = pd.DataFrame({
             'feature': self.model.feature_name(),
             'importance': self.model.feature_importance('gain')
