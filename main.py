@@ -23,11 +23,13 @@ def main():
     
     # Preprocess historical data
     processed_data = preprocessor.preprocess_features(historical_data)
-    
-    # Train model
-    X = processed_data.drop('target', axis=1)
-    y = processed_data['target']
-    model.train(X, y)
+
+    # Check if model exists and load it
+    if not model.load_model():
+        # Train model
+        X = processed_data.drop('target', axis=1)
+        y = processed_data['target']
+        model.train(X, y)
     
     # Start real-time prediction pipeline
     for event in data_ingestion.stream_events():
